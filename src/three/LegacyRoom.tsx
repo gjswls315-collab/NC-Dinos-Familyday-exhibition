@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import type { Layout, Rect } from '../layout'
+import { HERO_PHOTO } from '../data/content'
+import type { Layout, Rect, Seg } from '../layout'
 import { useStore } from '../store'
 import { C, Glow, Graphic, Selectable, shared, Showcase, Sword, TextPlane, Trophy } from './parts'
 import {
-  desaturate, F, heroPhotoPlaceholder, photoPlaceholder, textTexture, useCanvasTexture, useSlotTexture,
+  brandTexture, coverDesaturate, F, heroPhotoPlaceholder, photoPlaceholder, textTexture, useCanvasTexture, useSlotTexture,
 } from './textures'
 
 function WallBox({ r, h, color = C.navy }: { r: Rect; h: number; color?: string }) {
@@ -30,37 +31,60 @@ function SpotAt({ from, to, intensity, angle = 0.4, distance = 8 }: {
   return (<><primitive object={light} /><primitive object={light.target} /></>)
 }
 
-function Louver({ r, h, transparency }: { r: Rect; h: number; transparency: number }) {
+function segInfo(s: Seg) {
+  const dx = s.x2 - s.x1, dz = s.z2 - s.z1
+  return { len: Math.hypot(dx, dz), rotY: -Math.atan2(dz, dx), mx: (s.x1 + s.x2) / 2, mz: (s.z1 + s.z2) / 2 }
+}
+
+/** 사선 루버 가림막: 세로 루버 + 반투명 스크림. 길목에서는 실루엣과 빛만 비친다 */
+function Louver({ seg, h, transparency }: { seg: Seg; h: number; transparency: number }) {
   const ref = useRef<THREE.InstancedMesh>(null)
-  const len = r.z1 - r.z0
-  const pitch = 0.09
-  const n = Math.max(1, Math.floor(len / pitch))
+  const { len, rotY, mx, mz } = segInfo(seg)
+  const n = Math.max(1, Math.floor(len / 0.09))
   useEffect(() => {
     const m = new THREE.Matrix4()
     for (let i = 0; i < n; i++) {
-      m.makeTranslation((r.x0 + r.x1) / 2, h / 2, r.z0 + (i + 0.5) * (len / n))
+      m.makeTranslation(-len / 2 + (i + 0.5) * (len / n), h / 2, 0)
       ref.current!.setMatrixAt(i, m)
     }
     ref.current!.instanceMatrix.needsUpdate = true
-  }, [n, r.x0, r.x1, r.z0, len, h])
+  }, [n, len, h])
   return (
-    <Selectable id="louver" size={[0.12, h, len]} position={[0, 0, 0]} center={[(r.x0 + r.x1) / 2, h / 2, (r.z0 + r.z1) / 2]}>
+    <Selectable id="louver" size={[len, h, 0.14]} center={[0, h / 2, 0]} position={[mx, 0, mz]} rotation={[0, rotY, 0]}>
       <instancedMesh ref={ref} args={[undefined, undefined, n]} key={n}>
-        <boxGeometry args={[0.07, h, 0.032]} />
+        <boxGeometry args={[0.032, h, 0.07]} />
         <meshStandardMaterial color="#1b2233" roughness={0.8} />
       </instancedMesh>
-      {/* 반투명 스크림(메쉬 원단) */}
-      <mesh position={[r.x1 - 0.012, h / 2, (r.z0 + r.z1) / 2]} rotation={[0, Math.PI / 2, 0]} renderOrder={4}>
+      <mesh position={[0, h / 2, 0]} renderOrder={4}>
         <planeGeometry args={[len, h]} />
         <meshBasicMaterial color="#0a0e17" transparent opacity={1 - transparency} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      {/* 상·하부 레일 */}
       {[0.03, h - 0.03].map((y) => (
-        <mesh key={y} position={[(r.x0 + r.x1) / 2, y, (r.z0 + r.z1) / 2]}>
-          <boxGeometry args={[0.1, 0.06, len]} />
+        <mesh key={y} position={[0, y, 0]}>
+          <boxGeometry args={[len, 0.06, 0.1]} />
           <meshStandardMaterial color={C.black} roughness={0.6} />
         </mesh>
       ))}
+    </Selectable>
+  )
+}
+
+/** 홀을 향한 사선 외벽: 불투명 시선 차단 + 패밀리데이 브랜딩 */
+function BrandWall({ seg, h, center }: { seg: Seg; h: number; center: [number, number] }) {
+  const { len, rotY, mx, mz } = segInfo(seg)
+  const map = useCanvasTexture(() => brandTexture(len - 0.1, h - 0.1), [Math.round(len * 20), h])
+  // 로컬 +z 가 방 바깥을 향하는지 판별
+  const out = Math.sin(rotY) * (mx - center[0]) + Math.cos(rotY) * (mz - center[1]) > 0 ? 1 : -1
+  return (
+    <Selectable id="brand-wall" size={[len, h, 0.16]} center={[0, h / 2, 0]} position={[mx, 0, mz]} rotation={[0, rotY, 0]}>
+      <mesh position={[0, h / 2, 0]}>
+        <boxGeometry args={[len, h, 0.1]} />
+        <meshStandardMaterial color={C.navy} roughness={0.92} />
+      </mesh>
+      <Graphic map={map} size={[len - 0.1, h - 0.1]} position={[0, h / 2, out * 0.056]}
+        rotation={[0, out > 0 ? 0 : Math.PI, 0]} emissive={0.55} />
+      <Glow map={shared.wash} size={[len * 1.1, h]} position={[0, h / 2 + 0.1, out * 0.062]}
+        rotation={[0, out > 0 ? 0 : Math.PI, 0]} opacity={0.16} />
     </Selectable>
   )
 }
@@ -88,7 +112,19 @@ export function LegacyRoom({ layout }: { layout: Layout }) {
   const spot = useStore((s) => s.spotIntensity)
   const offsets = useStore((s) => s.offsets)
 
-  const hero = useSlotTexture('photo-yang', undefined, heroPhotoPlaceholder, [], desaturate)
+  const aspect = photo.w / photo.h
+  const hero = useSlotTexture('photo-yang', HERO_PHOTO, heroPhotoPlaceholder, [], coverDesaturate(aspect), aspect)
+  const extTitle = useCanvasTexture(() => textTexture([
+    { t: 'NC Dinos Family Day', font: F.serif(120), color: C.warm },
+    { t: '15TH ANNIVERSARY  ·  THE ROAD TO GLORY', font: F.sans(38, 500), color: C.gold, ls: 6 },
+  ], 1400, 250, 'center'), [])
+  const signSword = useCanvasTexture(() => textTexture([{ t: '집행검', font: F.sans(64, 700), color: C.gold }], 360, 100, 'center'), [])
+  const signTrophy = useCanvasTexture(() => textTexture([{ t: '우승 트로피', font: F.sans(56, 700), color: C.gold }], 360, 100, 'center'), [])
+  const polyGeo = useMemo(() => {
+    const sh = new THREE.Shape()
+    layout.roomPoly.forEach(([x, z], i) => (i ? sh.lineTo(x, z) : sh.moveTo(x, z)))
+    return new THREE.ShapeGeometry(sh)
+  }, [layout.roomPoly])
   const title15 = useCanvasTexture(() => textTexture([
     { t: '15TH ANNIVERSARY', font: F.serif(84), color: C.warm },
     { t: '다이노스 15주년 기념', font: F.sans(34, 400), color: C.gold },
@@ -110,11 +146,15 @@ export function LegacyRoom({ layout }: { layout: Layout }) {
   }
   const sSword = sc('sc-sword'), tL = sc('sc-trophy-l'), tR = sc('sc-trophy-r'), s15 = sc('sc-15th'), s20 = sc('sc-2020')
   const roomW = room.x1 - room.x0
-  const zoneCx = room.x0 + roomW * 0.42
-  const pv = Math.pow(bright, 1.4)
+  const zoneCx = layout.zoneCx
+  // 제공 사진이 이미 어둡게 보정된 상태라 100% 기준을 높게 잡는다
+  const pv = bright * 3.1
 
   return (
     <group>
+      <mesh geometry={polyGeo} position={[0, 0.008, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <meshStandardMaterial color="#111318" roughness={0.85} side={THREE.DoubleSide} />
+      </mesh>
       {/* 기존 벽면(코너 2면) 네이비 마감 */}
       <WallBox r={{ x0: room.x0, x1: room.x1 + 0.1, z0: -0.1, z1: 0 }} h={H} />
       <WallBox r={{ x0: room.x1, x1: room.x1 + 0.1, z0: 0, z1: room.z1 + 0.1 }} h={H} />
@@ -122,18 +162,19 @@ export function LegacyRoom({ layout }: { layout: Layout }) {
       {showWalls && (
         <>
           {layout.moduleWalls.map((r, i) => <WallBox key={i} r={r} h={H} />)}
-          <Louver r={layout.louver} h={H} transparency={transparency} />
-          {/* 출입구 상부 헤더 */}
+          <Louver seg={layout.louverSeg} h={H} transparency={transparency} />
+          <BrandWall seg={layout.brandSeg} h={H} center={[(room.x0 + room.x1) / 2, midZ]} />
+          {/* 벽 쪽 출입구 상부 헤더 + 룸 타이틀 */}
           <mesh position={[L - 0.05, (2.25 + H) / 2, layout.doorMid]}>
             <boxGeometry args={[0.1, H - 2.25, door.z1 - door.z0]} />
             <meshStandardMaterial color={C.navy} roughness={0.92} />
           </mesh>
-          {/* 날개벽 안내 타이틀 (길목 끝에서 우측으로 꺾으면 정면) */}
-          <TextPlane map={roomTitle} size={[1.05, 0.235]} position={[L - 0.6, 1.72, layout.wing.z0 - 0.004]} rotation={[0, Math.PI, 0]} />
-          <Glow map={shared.wash} size={[1.3, 1.6]} position={[L - 0.6, 1.75, layout.wing.z0 - 0.003]} rotation={[0, Math.PI, 0]} opacity={0.2} />
+          <TextPlane map={roomTitle} size={[1.25, 0.28]} position={[L - 0.104, (2.25 + H) / 2, layout.doorMid]} rotation={[0, -Math.PI / 2, 0]} />
+          {/* 홀을 향한 남측 가벽 외부 레터링 */}
+          <TextPlane map={extTitle} size={[4.2, 0.75]} position={[(room.x0 + room.x1) / 2, 1.65, room.z1 + 0.106]} />
+          <Glow map={shared.wash} size={[5.6, 2.2]} position={[(room.x0 + room.x1) / 2, 1.7, room.z1 + 0.104]} opacity={0.13} />
           {showCeiling && mode !== 'top' && (
-            <mesh position={[(room.x0 + room.x1) / 2, H + 0.01, room.z1 / 2]} rotation={[Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[roomW + 0.2, room.z1 + 0.2]} />
+            <mesh geometry={polyGeo} position={[0, H + 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
               <meshStandardMaterial color="#07080b" roughness={1} side={THREE.DoubleSide} />
             </mesh>
           )}
@@ -148,18 +189,20 @@ export function LegacyRoom({ layout }: { layout: Layout }) {
         </mesh>
         <mesh rotation={[0, -Math.PI / 2, 0]} position={[-0.004, 0, 0]} raycast={() => null} renderOrder={1}>
           <planeGeometry args={[photo.w, photo.h]} />
-          <meshBasicMaterial color="#0b1222" transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color="#0b1222" transparent opacity={0.2} depthWrite={false} />
         </mesh>
       </Selectable>
 
       {/* 집행검 + 트로피 2 (각각 독립 쇼케이스) */}
       <Selectable id="sc-sword" size={[0.74, 2.2, 0.74]} center={[0, 1.1, 0]} position={[sSword.x, 0, sSword.z]}>
         <Showcase w={0.7} d={0.7} plinthH={0.45} glassH={1.7}><Sword /></Showcase>
+        <TextPlane map={signSword} size={[0.4, 0.11]} position={[-0.353, 0.25, 0]} rotation={[0, -Math.PI / 2, 0]} />
         <Glow map={shared.glow} size={[2.6, 2.6]} position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} opacity={0.3 * spot} />
       </Selectable>
       {[tL, tR].map((t) => (
         <Selectable key={t.id} id={t.id} size={[0.64, 1.8, 0.64]} center={[0, 0.9, 0]} position={[t.x, 0, t.z]}>
           <Showcase w={0.6} d={0.6} plinthH={0.95} glassH={0.8}><Trophy /></Showcase>
+          <TextPlane map={signTrophy} size={[0.4, 0.11]} position={[-0.303, 0.62, 0]} rotation={[0, -Math.PI / 2, 0]} />
           <Glow map={shared.glow} size={[1.8, 1.8]} position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} opacity={0.2 * spot} />
         </Selectable>
       ))}

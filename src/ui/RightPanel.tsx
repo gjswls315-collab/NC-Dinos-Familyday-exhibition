@@ -66,7 +66,7 @@ function StructureTab() {
         <Slider label="가벽 높이" value={p.wallH} min={2.4} max={3.3} step={0.1} unit=" m" onChange={P('wallH')} />
         <Toggle label="모듈 가벽 표시" value={s.showWalls} onChange={(v) => s.set({ showWalls: v })} />
         <Toggle label="메인룸 암막 천장 (원단)" value={s.showCeiling} onChange={(v) => s.set({ showCeiling: v })} />
-        <Slider label="입구 가림막 투명도" value={s.louverTransparency} min={0} max={1} step={0.05} fmt={pct}
+        <Slider label="사선 입구 가림막 투명도" value={s.louverTransparency} min={0} max={1} step={0.05} fmt={pct}
           onChange={(v) => s.set({ louverTransparency: v })} />
       </Section>
       <button onClick={reset} className="w-full text-[11px] py-1.5 rounded border border-warm/20 text-warm/70 hover:bg-warm/10">
@@ -96,7 +96,7 @@ function LightTab() {
         <p className="text-[10px] text-warm/45 leading-relaxed">안을 누르면 메인룸 정면 시점으로 이동해 같은 구도로 비교합니다.</p>
       </Section>
       <Section title="세부 조절">
-        <Slider label="배경 사진 밝기 (양의지 선수)" value={s.photoBrightness} min={0.05} max={1} step={0.01} fmt={pct}
+        <Slider label="우승 세리머니 사진 밝기" value={s.photoBrightness} min={0.05} max={1} step={0.01} fmt={pct}
           onChange={(v) => s.set({ photoBrightness: v, preset: null })} />
         <Slider label="전시물 집중 조명" value={s.spotIntensity} min={0.3} max={1.6} step={0.05} fmt={pct}
           onChange={(v) => s.set({ spotIntensity: v, preset: null })} />

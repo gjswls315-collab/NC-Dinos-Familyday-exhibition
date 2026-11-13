@@ -33,14 +33,19 @@ export function buildItems(l: Layout): Item[] {
   items.push({
     id: 'photo-yang', name: '집행검 배경 사진', group: '④ 메인룸',
     spec: `출력 ${cm(l.photo.w)} × ${cm(l.photo.h)} cm`,
-    note: '양의지 선수 2020 집행검 세리머니 원본 사진 슬롯. 업로드 시 채도를 낮추고 네이비 오버레이를 적용합니다', image: true,
+    note: '제공받은 2020 집행검 세리머니 사진 적용 중(372×537px 저해상도). 실제 출력에는 고해상도 원본이 필요합니다', image: true,
   })
   for (let i = 1; i <= 3; i++) items.push({ id: `m-15th-${i}`, name: `15주년 이미지 ${i}`, group: '④ 메인룸', spec: '62 × 80 cm', image: true })
   for (let i = 1; i <= 3; i++) items.push({ id: `m-2020-${i}`, name: `2020 우승 사진 ${i}`, group: '④ 메인룸', spec: '62 × 80 cm', image: true })
   items.push({
     id: 'louver', name: '입구 루버 가림막', group: '④ 메인룸',
-    spec: `폭 ${cm(l.louver.z1 - l.louver.z0)} × 높이 ${cm(l.p.wallH)} cm`,
-    note: '세로 루버 + 반투명 스크림 원단. 모듈 가벽 프레임에 설치',
+    spec: `사선 길이 ${cm(Math.hypot(l.louverSeg.x2 - l.louverSeg.x1, l.louverSeg.z2 - l.louverSeg.z1))} × 높이 ${cm(l.p.wallH)} cm`,
+    note: '사선 진입부의 세로 루버 + 반투명 스크림 원단. 길목에서 집행검·트로피 실루엣만 비침',
+  })
+  items.push({
+    id: 'brand-wall', name: '사선 외벽 패밀리데이 브랜딩', group: '④ 메인룸',
+    spec: `폭 ${cm(Math.hypot(l.brandSeg.x2 - l.brandSeg.x1, l.brandSeg.z2 - l.brandSeg.z1))} × 높이 ${cm(l.p.wallH)} cm`,
+    note: '홀 쪽을 향한 불투명 가벽. 메인룸 내부 시선 차단 + 행사 브랜딩 그래픽',
   })
   return items
 }

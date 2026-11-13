@@ -104,6 +104,9 @@ export const BUDGET_DEFAULT: BudgetRow[] = [
 ]
 export const BUDGET_LIMIT = 2000
 
+// 집행검 배경 사진 (사용자 제공 2020 세리머니 사진). 고해상도 원본 수령 시 이 파일만 교체.
+export const HERO_PHOTO = 'assets/yang-2020-ceremony.jpg'
+
 // 캔버스 텍스처에 쓰이는 글자를 미리 로드하기 위한 문자열
 export const ALL_TEXT =
   JSON.stringify([HISTORY, FRAMES, UNIFORMS.map((u) => u.name), HISTORY_BODY]) +

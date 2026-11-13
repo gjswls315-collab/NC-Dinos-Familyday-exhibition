@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { HISTORY } from '../data/content'
-import { DOOR_W } from '../layout'
 import { useStore } from '../store'
 import { rig } from '../three/CameraRig'
 import { useLayout } from '../useLayout'
@@ -56,7 +55,7 @@ export function FloorPlan({ detail = false }: { detail?: boolean }) {
     <svg viewBox={vb.join(' ')} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
       {/* 전시 바닥 영역 */}
       <rect x={-1.2} y={0} width={L + 1.2} height={W + 0.7} fill="#1a2030" />
-      <rect x={room.x0} y={0} width={p.roomW} height={p.roomD} fill="#161b29" />
+      <polygon points={l.roomPoly.map((q) => q.join(',')).join(' ')} fill="#161b29" />
       {/* 기존 벽 (홀 벽체·코너) */}
       <line x1={vb[0]} y1={-0.12} x2={room.x1 + 0.12} y2={-0.12} stroke="#8a8170" strokeWidth={0.22} />
       <line x1={room.x1 + 0.12} y1={-0.22} x2={room.x1 + 0.12} y2={vb[1] + vb[3]} stroke="#8a8170" strokeWidth={0.22} />
@@ -81,7 +80,12 @@ export function FloorPlan({ detail = false }: { detail?: boolean }) {
         <rect key={i} x={r.x0} y={r.z0} width={r.x1 - r.x0} height={r.z1 - r.z0} fill={GOLD} />
       ))}
       {showWalls && (
-        <line x1={L - 0.05} y1={0} x2={L - 0.05} y2={l.louver.z1} stroke={GOLD} strokeWidth={0.12} strokeDasharray="0.06 0.08" />
+        <>
+          <line x1={l.louverSeg.x1} y1={l.louverSeg.z1} x2={l.louverSeg.x2} y2={l.louverSeg.z2}
+            stroke={selected === 'louver' ? '#ffd27a' : GOLD} strokeWidth={0.12} strokeDasharray="0.06 0.08" />
+          <line x1={l.brandSeg.x1} y1={l.brandSeg.z1} x2={l.brandSeg.x2} y2={l.brandSeg.z2}
+            stroke={selected === 'brand-wall' ? '#ffd27a' : GOLD} strokeWidth={0.12} strokeLinecap="round" />
+        </>
       )}
       {/* 쇼케이스 */}
       {l.showcases.map((s) => {
@@ -95,14 +99,14 @@ export function FloorPlan({ detail = false }: { detail?: boolean }) {
       {/* 배경 사진 */}
       <line x1={room.x1 - 0.04} y1={l.photo.z - l.photo.w / 2} x2={room.x1 - 0.04} y2={l.photo.z + l.photo.w / 2} stroke={WARM} strokeWidth={0.08} />
       {/* 동선 */}
-      <path d={`M -1 ${W * 0.55} L ${L - 0.8} ${W * 0.55} L ${L - 0.8} ${l.doorMid} L ${L + 1.2} ${l.doorMid}`}
+      <path d={`M -1 ${W * 0.55} L ${L - 2.6} ${W * 0.5} L ${L - 0.6} ${l.doorMid + 0.1} L ${L + 1.2} ${l.doorMid + 0.4}`}
         fill="none" stroke={WARM} strokeOpacity={0.45} strokeWidth={0.04} strokeDasharray="0.18 0.14" />
-      <path d={`M ${L + 1.2} ${l.doorMid} l -0.28 -0.16 v 0.32 z`} fill={WARM} fillOpacity={0.6} />
+      <path d={`M ${L + 1.25} ${l.doorMid + 0.42} l -0.3 -0.12 l 0.04 0.32 z`} fill={WARM} fillOpacity={0.6} />
 
       {label(l.histCx, W * 0.3, '1', 'HISTORY ARCHIVE')}
       {label(l.framesCx - (detail ? 1.4 : 0), W * 0.3, '2', 'FAMILY DAY ARCHIVE')}
-      {label(L * 0.42, W + (detail ? 0.75 : 0.65), '3', 'UNIFORM ARCHIVE (개방형)')}
-      {label(room.x0 + (detail ? 0.9 : p.roomW * 0.4), detail ? 1.5 : l.midZ, '4', 'THE LEGACY ROOM')}
+      {label(L * (detail ? 0.22 : 0.42), W + (detail ? 0.75 : 0.65), '3', 'UNIFORM ARCHIVE (개방형)')}
+      {label(room.x0 + (detail ? 1.3 : p.roomW * 0.4), detail ? 2.05 : l.midZ, '4', 'THE LEGACY ROOM')}
 
       {detail && (
         <>
@@ -110,12 +114,13 @@ export function FloorPlan({ detail = false }: { detail?: boolean }) {
           {dim(room.x0, -0.8, room.x1, -0.8, `메인룸 ${p.roomW.toFixed(1)} m`, -0.3)}
           {dim(-1.9, 0, -1.9, W, `폭 ${W.toFixed(1)} m`, -1.75)}
           {dim(room.x1 + 0.7, 0, room.x1 + 0.7, p.roomD, `${p.roomD.toFixed(1)} m`, 0.2)}
-          <text x={L - 1.35} y={l.doorMid + 0.1} fontSize={0.26} fill={WARM} textAnchor="end">출입구 {DOOR_W} m →</text>
-          <text x={L - 0.35} y={l.louver.z1 / 2} fontSize={0.26} fill={GOLD} textAnchor="end">루버 가림막</text>
-          <text x={room.x1 - 0.2} y={l.midZ - l.photo.w / 2 - 0.2} fontSize={0.24} fill={WARM} textAnchor="end">배경 사진</text>
+          <text x={L + 0.25} y={l.doorMid - 0.25} fontSize={0.24} fill={WARM}>출입구 {(l.door.z1 - l.door.z0).toFixed(1)} m</text>
+          <text x={l.apex.x - 0.3} y={l.apex.z - 0.1} fontSize={0.26} fill={GOLD} textAnchor="end">사선 루버 가림막 (반투명)</text>
+          <text x={l.apex.x - 0.1} y={l.apex.z + 1.05} fontSize={0.26} fill={GOLD} textAnchor="end">사선 외벽 · 패밀리데이 브랜딩</text>
+          <text x={room.x1 - 0.2} y={l.midZ - 0.6} fontSize={0.24} fill={WARM} textAnchor="end">배경 사진</text>
           <text x={l.sword.x - 0.55} y={l.midZ + 0.08} fontSize={0.24} fill={GOLD} textAnchor="end">집행검</text>
           <text x={-1.1} y={W * 0.55 - 0.2} fontSize={0.26} fill={WARM}>입구 →</text>
-          <text x={L * 0.42} y={W + 1.6} fontSize={0.28} fill={WARM} fillOpacity={0.6} textAnchor="middle">
+          <text x={L * 0.3} y={W + 1.9} fontSize={0.28} fill={WARM} fillOpacity={0.6} textAnchor="middle">
             ↓ 컨벤션홀 (OX 퀴즈 · 팬사인회 운영 구역)
           </text>
           <text x={l.histCx} y={-0.3} fontSize={0.24} fill={WARM} fillOpacity={0.7} textAnchor="middle">
@@ -181,7 +186,7 @@ export function PlanModal() {
           <div className="space-y-1 text-warm/75 w-64">
             <div><span className="inline-block w-5 h-1.5 bg-[#8a8170] mr-2 align-middle" />기존 벽체 (홀 벽면 · 코너)</div>
             <div><span className="inline-block w-5 h-1.5 bg-gold mr-2 align-middle" />신규 모듈 가벽</div>
-            <div><span className="inline-block w-5 border-t-2 border-dashed border-gold mr-2 align-middle" />루버 가림막 (반투명)</div>
+            <div><span className="inline-block w-5 border-t-2 border-dashed border-gold mr-2 align-middle" />사선 루버 가림막 (반투명)</div>
             <div><span className="inline-block w-2.5 h-2.5 rounded-full border border-warm bg-black mr-2 align-middle" />유니폼 토르소 (가벽 없음)</div>
           </div>
         </div>

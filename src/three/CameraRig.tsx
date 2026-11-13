@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import type { Layout, Pose, Rect } from '../layout'
+import type { Layout, Pose, Rect, Seg } from '../layout'
 import { useStore } from '../store'
 
 /** 미니맵 등 외부에서 읽는 현재 관람자 위치 */
@@ -24,7 +24,7 @@ const angLerp = (a: number, b: number, t: number) => {
 function colliders(layout: Layout, showWalls: boolean, offsets: Record<string, { dx: number; dz: number }>): Rect[] {
   const { hall, plinth, room } = layout
   const r: Rect[] = [plinth]
-  if (showWalls) r.push(...layout.moduleWalls, layout.louver)
+  if (showWalls) r.push(...layout.moduleWalls)
   layout.showcases.forEach((s) => {
     const o = offsets[s.id] ?? { dx: 0, dz: 0 }
     r.push({ x0: s.x + o.dx - s.w / 2, x1: s.x + o.dx + s.w / 2, z0: s.z + o.dz - s.d / 2, z1: s.z + o.dz + s.d / 2 })
@@ -37,8 +37,14 @@ function colliders(layout: Layout, showWalls: boolean, offsets: Record<string, {
   r.push({ x0: room.x1, x1: room.x1 + 1, z0: -1, z1: hall.z1 + 1 })
   return r
 }
-const hit = (x: number, z: number, rects: Rect[], rad = 0.28) =>
+const hitRect = (x: number, z: number, rects: Rect[], rad = 0.28) =>
   rects.some((r) => x > r.x0 - rad && x < r.x1 + rad && z > r.z0 - rad && z < r.z1 + rad)
+const hitSeg = (x: number, z: number, segs: Seg[], rad = 0.36) =>
+  segs.some((s) => {
+    const dx = s.x2 - s.x1, dz = s.z2 - s.z1
+    const t = Math.max(0, Math.min(1, ((x - s.x1) * dx + (z - s.z1) * dz) / (dx * dx + dz * dz)))
+    return Math.hypot(x - (s.x1 + dx * t), z - (s.z1 + dz * t)) < rad
+  })
 
 export function CameraRig({ layout }: { layout: Layout }) {
   const { camera, gl } = useThree()
@@ -161,8 +167,10 @@ export function CameraRig({ layout }: { layout: Layout }) {
         const dx = (-sin * fwd + cos * side) * sp
         const dz = (-cos * fwd - sin * side) * sp
         const rects = colliders(l, st.showWalls, st.offsets)
-        if (!hit(rig.x + dx, rig.z, rects)) rig.x += dx
-        if (!hit(rig.x, rig.z + dz, rects)) rig.z += dz
+        const segs = st.showWalls ? [l.louverSeg, l.brandSeg] : []
+        const hit = (x: number, z: number) => hitRect(x, z, rects) || hitSeg(x, z, segs)
+        if (!hit(rig.x + dx, rig.z)) rig.x += dx
+        if (!hit(rig.x, rig.z + dz)) rig.z += dz
         rig.y += (1.6 - rig.y) * Math.min(1, dt * 6)
       }
     }

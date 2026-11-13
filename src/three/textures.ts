@@ -31,7 +31,7 @@ export function useCanvasTexture(factory: () => THREE.Texture, deps: unknown[]) 
 /** 교체 가능한 이미지 슬롯: 업로드/콘텐츠 경로가 있으면 실제 이미지, 없으면 플레이스홀더 */
 export function useSlotTexture(
   id: string, path: string | undefined, fallback: () => THREE.Texture, deps: unknown[],
-  process?: (img: HTMLImageElement) => HTMLCanvasElement,
+  process?: (img: HTMLImageElement) => HTMLCanvasElement, processKey: unknown = 0,
 ) {
   const url = useStore((s) => s.images[id]) ?? path
   const placeholder = useCanvasTexture(fallback, deps)
@@ -53,7 +53,7 @@ export function useSlotTexture(
     img.src = url
     return () => { alive = false; t?.dispose() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url])
+  }, [url, processKey])
   return loaded ?? placeholder
 }
 
@@ -269,14 +269,50 @@ export function heroPhotoPlaceholder() {
   return tex(c)
 }
 
-/** 업로드된 사진의 채도를 낮춰 캔버스로 변환 */
-export function desaturate(img: HTMLImageElement) {
-  const max = 2048
-  const s = Math.min(1, max / Math.max(img.width, img.height))
-  const [c, g] = canvas(Math.round(img.width * s), Math.round(img.height * s))
-  g.filter = 'saturate(35%)'
-  g.drawImage(img, 0, 0, c.width, c.height)
+/** 사진을 패널 비율에 맞게 가운데 크롭(cover)하고 채도를 낮춰 캔버스로 변환 */
+export const coverDesaturate = (aspect: number) => (img: HTMLImageElement) => {
+  let sw = img.width, sh = img.height
+  if (sw / sh > aspect) sw = sh * aspect
+  else sh = sw / aspect
+  const s = Math.min(1, 2048 / Math.max(sw, sh))
+  const [c, g] = canvas(Math.round(sw * s), Math.round(sh * s))
+  g.filter = 'saturate(45%)'
+  g.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, c.width, c.height)
   return c
+}
+
+/** 사선 외벽 패밀리데이 브랜딩 그래픽 */
+export function brandTexture(w: number, h: number) {
+  const W = 1024, H = Math.round((1024 * h) / w)
+  const [c, g] = canvas(W, H)
+  const grd = g.createLinearGradient(0, 0, 0, H)
+  grd.addColorStop(0, '#16223a')
+  grd.addColorStop(1, '#0e1626')
+  g.fillStyle = grd
+  g.fillRect(0, 0, W, H)
+  g.strokeStyle = 'rgba(184,155,105,0.8)'
+  g.lineWidth = 5
+  g.strokeRect(34, 34, W - 68, H - 68)
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillStyle = GOLD
+  g.font = F.sans(40, 500)
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = '14px'
+  g.fillText('NC DINOS', W / 2, H * 0.2)
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = '0px'
+  g.fillStyle = WARM
+  g.font = F.serif(190, true, 500)
+  g.fillText('Family', W / 2, H * 0.36)
+  g.fillText('Day', W / 2, H * 0.52)
+  g.fillStyle = GOLD
+  g.fillRect(W / 2 - 60, H * 0.635, 120, 3)
+  g.fillStyle = WARM
+  g.font = F.sans(44, 700)
+  g.fillText('15TH ANNIVERSARY', W / 2, H * 0.71)
+  g.fillStyle = GOLD
+  g.font = F.serif(48, true, 500)
+  g.fillText('The Road to Glory', W / 2, H * 0.79)
+  return tex(c)
 }
 
 export function floorLabelTexture(title: string, sub: string) {

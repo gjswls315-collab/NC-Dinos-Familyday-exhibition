@@ -18,10 +18,11 @@ export const DEFAULT_PARAMS: Params = {
   roomW: 7,
   roomD: 6,
   wallH: 2.7,
-  uniformGap: 0.58,
+  uniformGap: 0.56,
 }
 
 export interface Rect { x0: number; x1: number; z0: number; z1: number }
+export interface Seg { x1: number; z1: number; x2: number; z2: number }
 export interface Pose { pos: [number, number, number]; target: [number, number, number] }
 
 export const PLINTH_D = 0.42
@@ -38,10 +39,19 @@ export function computeLayout(p: Params) {
   const W = p.corridorW
   const room: Rect = { x0: L, x1: L + p.roomW, z0: 0, z1: p.roomD }
 
-  // 메인룸 서측면: [루버 가림막] [출입구] [솔리드 가벽]
-  const doorZ0 = clamp(W + 0.2, 1.2, p.roomD - DOOR_W - 0.3)
-  const door = { z0: doorZ0, z1: doorZ0 + DOOR_W }
-  const doorMid = (door.z0 + door.z1) / 2
+  // 메인룸 서측면(사선 진입부):
+  //  [벽 쪽 출입구] → [사선 루버 가림막: 반투명] → 꼭짓점 → [사선 외벽: 불투명, 패밀리데이 브랜딩]
+  const gapW = Math.min(DOOR_W, W - 0.4)
+  const door = { z0: 0, z1: gapW }
+  const doorMid = gapW / 2
+  const apex = { x: L - 1.5, z: clamp(W + 1.4, gapW + 1, p.roomD - 0.8) }
+  const louverSeg: Seg = { x1: L, z1: gapW, x2: apex.x, z2: apex.z }
+  const brandSeg: Seg = { x1: apex.x, z1: apex.z, x2: L, z2: p.roomD + WALL_T }
+  // 사선 가림막이 유니폼 열(z=W)과 만나는 x
+  const louverXAtW = L - 1.5 * clamp((W - gapW) / (apex.z - gapW), 0, 1)
+  const roomPoly: [number, number][] = [
+    [L, 0], [room.x1, 0], [room.x1, p.roomD], [L, p.roomD], [apex.x, apex.z], [L, gapW],
+  ]
 
   // 좌측 벽: 인트로 → 역사 패널 6 → 패밀리데이 액자 8
   const intro = { x0: 0.15, x1: 1.35 }
@@ -70,7 +80,7 @@ export function computeLayout(p: Params) {
 
   // 우측: 유니폼 토르소 20 (뒤 가벽 없음, 홀 방향 개방)
   const uStart = 1.2
-  const uMax = L - 1.4
+  const uMax = louverXAtW - 1.05
   const uniforms = UNIFORMS.map((u, i) => ({ ...u, x: uStart + i * p.uniformGap, z: W }))
   const uEnd = uniforms[uniforms.length - 1].x
   const uniformOverflow = uEnd > uMax + 1e-6
@@ -87,16 +97,14 @@ export function computeLayout(p: Params) {
     { id: 'sc-15th', name: '15주년 기념품 전시대', x: room.x0 + p.roomW * 0.42, z: 0.4, w: 2.6, d: 0.55 },
     { id: 'sc-2020', name: '2020 우승 기념품 전시대', x: room.x0 + p.roomW * 0.42, z: p.roomD - 0.4, w: 2.6, d: 0.55 },
   ]
-  const photo = { w: Math.min(3.6, p.roomD - 1.4), h: p.wallH - 0.25, z: midZ }
+  // 배경 사진: 제공 원본이 세로형(약 0.69:1)이라 세로 패널로 설치
+  const photo = { w: (p.wallH - 0.2) * 0.74, h: p.wallH - 0.2, z: midZ }
 
   // 가벽 (모듈) — 평면 사각형
-  const wing: Rect = { x0: L - 1.2, x1: L, z0: door.z1, z1: door.z1 + WALL_T }
   const moduleWalls: Rect[] = [
     { x0: room.x0, x1: room.x1, z0: room.z1, z1: room.z1 + WALL_T }, // 남측(홀 방향)
-    { x0: L - WALL_T, x1: L, z0: door.z1, z1: room.z1 + WALL_T }, // 서측 솔리드
-    wing, // 출입구 시선 차단 날개벽
   ]
-  const louver: Rect = { x0: L - WALL_T, x1: L, z0: 0, z1: door.z0 }
+  const zoneCx = room.x0 + p.roomW * 0.42
 
   const hall: Rect = { x0: room.x1 - HALL_LEN, x1: room.x1, z0: 0, z1: HALL_DEPTH }
 
@@ -106,7 +114,9 @@ export function computeLayout(p: Params) {
     history: { pos: [histCx, eye, W - 0.75], target: [histCx, 1.45, 0] },
     family: { pos: [framesCx, eye, W - 0.75], target: [framesCx, 1.5, 0] },
     uniform: { pos: [L * 0.22, eye, 0.9], target: [L * 0.55, 1.25, W] },
-    legacy: { pos: [L - 2.2, eye, W * 0.5], target: [L, 1.4, door.z0 * 0.55] },
+    legacy: { pos: [L - 3.4, eye, W * 0.5], target: [sword.x, 1.35, midZ] },
+    left15: { pos: [zoneCx, eye, 2.4], target: [zoneCx, 1.35, 0] },
+    right20: { pos: [zoneCx, eye, p.roomD - 2.4], target: [zoneCx, 1.35, p.roomD] },
     front: { pos: [room.x0 + 1.3, 1.55, midZ], target: [sword.x, 1.4, midZ] },
     hall: { pos: [L * 0.42, 1.7, Math.min(13, HALL_DEPTH - 2)], target: [L * 0.78, 1.3, 0] },
     top: { pos: [room.x1 * 0.5 + 1.5, 27, 15], target: [room.x1 * 0.5 + 1.5, 0, 3.6] },
@@ -118,16 +128,16 @@ export function computeLayout(p: Params) {
     { pos: [histCx, eye, W * 0.56], target: [histEnd + 1, 1.5, 0] },
     { pos: [histEnd + 0.5, eye, W * 0.52], target: [framesCx + 1, 1.5, 0] },
     { pos: [framesCx, eye, W * 0.48], target: [L - 0.5, 1.3, W] },
-    { pos: [L - 0.8, eye, W * 0.55], target: [L + 3, 1.4, door.z0 * 0.4] },
-    { pos: [L - 0.75, eye, doorMid], target: [L + 3, 1.4, doorMid] },
-    { pos: [L + 1.0, eye, doorMid], target: [sword.x, 1.4, midZ] },
+    { pos: [L - 2.4, eye, W * 0.45], target: [sword.x, 1.4, midZ] },
+    { pos: [L - 0.7, eye, doorMid + 0.1], target: [L + 3, 1.4, doorMid + 0.6] },
+    { pos: [L + 1.0, eye, doorMid + 0.35], target: [sword.x, 1.4, midZ] },
     { pos: [room.x0 + 1.6, 1.55, midZ], target: [sword.x, 1.4, midZ] },
   ]
 
   return {
     p, L, W, room, door, doorMid, intro, history, histCx, histStart, histEnd, frames, framesCx,
     frStart, frEnd, plinth, uniforms, uniformOverflow, uMax, clearAisle, sword, showcases, photo,
-    moduleWalls, wing, louver, hall, poses, tour, midZ,
+    moduleWalls, louverSeg, brandSeg, apex, roomPoly, zoneCx, hall, poses, tour, midZ,
   }
 }
 

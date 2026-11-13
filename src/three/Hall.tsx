@@ -53,10 +53,6 @@ export function Hall({ layout }: { layout: Layout }) {
         <planeGeometry args={[exW, W + 0.7]} />
         <meshStandardMaterial color="#15171c" roughness={0.9} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(room.x0 + room.x1) / 2, 0.006, room.z1 / 2]}>
-        <planeGeometry args={[room.x1 - room.x0, room.z1]} />
-        <meshStandardMaterial color="#111318" roughness={0.85} />
-      </mesh>
 
       {/* 벽 4면 */}
       <mesh position={[cx, HALL_H / 2, -0.12]}><planeGeometry args={[w, HALL_H]} />{wallMat}</mesh>

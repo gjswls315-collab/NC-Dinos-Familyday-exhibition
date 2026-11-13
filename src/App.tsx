@@ -17,7 +17,9 @@ const ZONES = [
   { id: 'history', n: '1', en: 'HISTORY ARCHIVE', ko: '다이노스 역사 기록' },
   { id: 'family', n: '2', en: 'FAMILY DAY ARCHIVE', ko: '패밀리데이 액자 8점' },
   { id: 'uniform', n: '3', en: 'UNIFORM ARCHIVE', ko: '유니폼 20벌 · 개방형' },
-  { id: 'legacy', n: '4', en: 'THE LEGACY ROOM', ko: '메인룸 진입부 · 가림막' },
+  { id: 'legacy', n: '4', en: 'THE LEGACY ROOM', ko: '사선 진입부 · 가림막' },
+  { id: 'left15', n: '15', en: '15TH ANNIVERSARY', ko: '메인룸 좌측 · 15주년 전시' },
+  { id: 'right20', n: '20', en: '2020 CHAMPIONS', ko: '메인룸 우측 · 우승 전시' },
 ]
 
 function screenshot() {
